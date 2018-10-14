@@ -124,6 +124,8 @@ public class MainActivity extends AppCompatActivity implements ConnectionListene
         });
         mMessageRecyclerView.setAdapter(mMessageAdapter);
         mMessageRecyclerView.setNestedScrollingEnabled(false);
+        if(mMessageAdapter.getItemCount()>0)
+            mMessageRecyclerView.smoothScrollToPosition(mMessageAdapter.getItemCount()-1);
     }
 
     private void onSendButtonClick() {
@@ -170,6 +172,7 @@ public class MainActivity extends AppCompatActivity implements ConnectionListene
     private void updateView(MessageList messageListObject){
         if(mMessageAdapter!=null){
             mMessageAdapter.updateData(messageListObject);
+            if(mMessageAdapter.getItemCount()>0)
             mMessageRecyclerView.smoothScrollToPosition(mMessageAdapter.getItemCount()-1);
         }
 
