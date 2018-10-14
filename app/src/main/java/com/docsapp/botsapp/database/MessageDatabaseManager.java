@@ -7,6 +7,10 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 
+import com.docsapp.botsapp.model.MessageList;
+
+import java.util.ArrayList;
+
 public class MessageDatabaseManager {
 
         private MessageDatabaseHelper dbHelper;
@@ -26,23 +30,38 @@ public class MessageDatabaseManager {
         }
 
         public void close() {
-                dbHelper.close();
+                if(!database.isDbLockedByCurrentThread()){
+                        dbHelper.close();
+                }
         }
 
         public void insert(String message, String desc) {
                 ContentValues contentValue = new ContentValues();
                 contentValue.put(MessageDatabaseHelper.MESSAGE, message);
                 contentValue.put(MessageDatabaseHelper.SENDER, desc);
-                database.insert(MessageDatabaseHelper.TABLE_NAME, null, contentValue);
+                if(database.isOpen())
+                        database.insert(MessageDatabaseHelper.TABLE_NAME, null, contentValue);
+                else{
+                        database = dbHelper.getWritableDatabase();
+                        database.insert(MessageDatabaseHelper.TABLE_NAME, null, contentValue);
+                        database.close();
+                }
         }
 
-        public Cursor fetch() {
+        public ArrayList<MessageList> fetch() {
                 String[] columns = new String[] { MessageDatabaseHelper._ID, MessageDatabaseHelper.MESSAGE, MessageDatabaseHelper.SENDER };
                 Cursor cursor = database.query(MessageDatabaseHelper.TABLE_NAME, columns, null, null, null, null, null);
-                if (cursor != null) {
-                        cursor.moveToFirst();
+                ArrayList<MessageList>messageLists=new ArrayList<>();
+                if (cursor.moveToFirst()) {
+                        //Loop through the table rows
+                        do {
+                                MessageList messageListObject = new MessageList();
+                                messageListObject.setMessage(cursor.getString(cursor.getColumnIndex(MessageDatabaseHelper.MESSAGE)));
+                                messageListObject.setSender(cursor.getString(cursor.getColumnIndex(MessageDatabaseHelper.SENDER)));
+                                messageLists.add(messageListObject);
+                        } while (cursor.moveToNext());
                 }
-                return cursor;
+                return messageLists;
         }
 
         public int update(long _id, String message, String desc) {

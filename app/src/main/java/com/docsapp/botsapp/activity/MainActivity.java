@@ -1,6 +1,7 @@
 package com.docsapp.botsapp.activity;
 
 import android.app.Activity;
+import android.database.Cursor;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -21,6 +22,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.docsapp.botsapp.R;
+import com.docsapp.botsapp.database.MessageDatabaseManager;
 import com.docsapp.botsapp.model.MessageList;
 import com.docsapp.botsapp.model.MessageResponseModel;
 import com.docsapp.botsapp.model.ResponseModel;
@@ -35,16 +37,19 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
     public static String ME="me";
     private RequestQueue mRequestQueue;
-    /* private  NetworkTask mNetworkTask;*/
     private EditText mMessageEt;
     private TextView mSendButton;
     private RecyclerView mMessageRecyclerView;
     private MessageAdapter mMessageAdapter;
+    private MessageDatabaseManager mMessageDatabaseManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        if(getSupportActionBar()!=null)
+            getSupportActionBar().setTitle(getString(R.string.chatbot));
+        initDB();
 
         mMessageEt=findViewById(R.id.message_box);
         mSendButton=findViewById(R.id.send_button);
@@ -59,6 +64,11 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         mRequestQueue = Volley.newRequestQueue(this);
+    }
+
+    private void initDB() {
+        mMessageDatabaseManager = new MessageDatabaseManager(this);
+        mMessageDatabaseManager.open();
     }
 
     private TextWatcher textWatcher=new TextWatcher() {
@@ -86,7 +96,8 @@ public class MainActivity extends AppCompatActivity {
     private void initializeRV() {
         LinearLayoutManager llm = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
         mMessageRecyclerView.setLayoutManager(llm);
-        mMessageAdapter=new MessageAdapter(this,new ArrayList<MessageList>(), new MessageAdapter.onMessageItemClick() {
+        ArrayList<MessageList> messageLists=mMessageDatabaseManager.fetch();
+        mMessageAdapter=new MessageAdapter(this,messageLists, new MessageAdapter.onMessageItemClick() {
             @Override
             public void onItemClick(MessageList model) {
 
@@ -117,12 +128,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateViewAndTable(MessageList msgList){
         updateView(msgList);
-//        performDB
-
+        final String message = msgList.getMessage();
+        final String sender = msgList.getSender();
+        mMessageDatabaseManager.insert(message, sender);
     }
+
     private void updateView(MessageList messageListObject){
         if(mMessageAdapter!=null){
             mMessageAdapter.updateData(messageListObject);
+            mMessageRecyclerView.smoothScrollToPosition(mMessageAdapter.getItemCount()-1);
         }
 
     }
@@ -146,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mMessageDatabaseManager.close();
     }
 
     private void makeAPICall(final String url){
