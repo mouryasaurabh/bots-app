@@ -38,7 +38,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageV
 
     @Override
     public void onBindViewHolder(@NonNull MessageViewholder holder, int position) {
-        if(messageList.get(position).getSender().equals("me")){
+        if(messageList.get(position).getSender().equals(MainActivity.ME)){
             holder.mItemView.setBackgroundResource(R.drawable.outgoing_message);
         }else{
             holder.mItemView.setBackgroundResource(R.drawable.incoming_message);

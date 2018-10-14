@@ -6,7 +6,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -31,6 +33,7 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
+    public static String ME="me";
     private RequestQueue mRequestQueue;
     /* private  NetworkTask mNetworkTask;*/
     private EditText mMessageEt;
@@ -42,30 +45,48 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mRequestQueue = Volley.newRequestQueue(this);
+
         mMessageEt=findViewById(R.id.message_box);
         mSendButton=findViewById(R.id.send_button);
         mMessageRecyclerView=findViewById(R.id.recycler_view);
-        LinearLayoutManager llm = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
-        mMessageRecyclerView.setLayoutManager(llm);
-        ArrayList<MessageList> messageLists=new ArrayList();
-        initializeRV(messageLists);
+        mMessageEt.addTextChangedListener(textWatcher);
+
+        initializeRV();
         mSendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String msg=mMessageEt.getText().toString();
-                if(!TextUtils.isEmpty(msg)){
-                    pushToTable(msg);
-                    mMessageEt.setText("");
-                    hideKeyboard();
-                }
+                onSendButtonClick();
             }
         });
+        mRequestQueue = Volley.newRequestQueue(this);
     }
 
+    private TextWatcher textWatcher=new TextWatcher() {
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
 
-    private void initializeRV(ArrayList<MessageList> messageLists) {
-        mMessageAdapter=new MessageAdapter(this,messageLists, new MessageAdapter.onMessageItemClick() {
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+            if(!TextUtils.isEmpty(s)){
+                mSendButton.setVisibility(View.VISIBLE);
+            }else{
+                mSendButton.setVisibility(View.INVISIBLE);
+            }
+
+        }
+    };
+
+    private void initializeRV() {
+        LinearLayoutManager llm = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
+        mMessageRecyclerView.setLayoutManager(llm);
+        mMessageAdapter=new MessageAdapter(this,new ArrayList<MessageList>(), new MessageAdapter.onMessageItemClick() {
             @Override
             public void onItemClick(MessageList model) {
 
@@ -75,6 +96,30 @@ public class MainActivity extends AppCompatActivity {
         mMessageRecyclerView.setNestedScrollingEnabled(false);
     }
 
+    private void onSendButtonClick() {
+        String msg=mMessageEt.getText().toString();
+        if(!TextUtils.isEmpty(msg)){
+            mMessageEt.setText("");
+            hideKeyboard();
+            MessageList messageList=new MessageList();
+            messageList.setSender(ME);
+            messageList.setMessage(msg);
+            updateViewAndTable(messageList);
+            pushMessageToServer(msg);
+        }
+    }
+
+
+    private void hideKeyboard( ) {
+        InputMethodManager imm = (InputMethodManager) this.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(mMessageEt.getWindowToken(), 0);
+    }
+
+    private void updateViewAndTable(MessageList msgList){
+        updateView(msgList);
+//        performDB
+
+    }
     private void updateView(MessageList messageListObject){
         if(mMessageAdapter!=null){
             mMessageAdapter.updateData(messageListObject);
@@ -82,12 +127,10 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void hideKeyboard( ) {
-        InputMethodManager imm = (InputMethodManager) this.getSystemService(Activity.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(mMessageEt.getWindowToken(), 0);
+    private void pushMessageToServer(String message){
+        String url=createMsgUrl(message);
+        makeAPICall(url);
     }
-
-
 
     private String createMsgUrl(String msg){
         try {
@@ -99,80 +142,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
-
-    private void pushToTable(String msg){
-        MessageList messageList=new MessageList();
-        messageList.setSender("me");
-        messageList.setMessage(msg);
-        updateView(messageList);
-        pushMessageToServer(msg);
-
-    }
-
-    private void pushMessageToServer(String message){
-        String url=createMsgUrl(message);
-
-        makeAPICall(url);
-//        mNetworkTask=new NetworkTask();
-//        mNetworkTask.execute(url);
-    }
-
-
-   /* public class NetworkTask extends AsyncTask<String,Void,MessageList> {
-
-        @Override
-        protected MessageList doInBackground(String... strings) {
-            String url = strings[0];
-
-            System.out.println("xxxxx Request URL: "+url);
-            JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url,null,
-                    new Response.Listener<JSONObject>() {
-                        @Override
-                        public void onResponse(JSONObject jsonObject) {
-
-                            try {
-                                System.out.println("xxxxx Response: "+jsonObject.toString());
-                                JSONObject messageJsonObject = jsonObject.getJSONObject("message");
-
-                                MessageResponseModel messageResponseModel=new MessageResponseModel();
-                                messageResponseModel.setChatBotName( messageJsonObject.getString("chatBotName"));
-                                messageResponseModel.setChatBotID(messageJsonObject.getInt("chatBotID"));
-                                messageResponseModel.setMessage(messageJsonObject.getString("message"));
-                                messageResponseModel.setEmotion(messageJsonObject.getString("emotion"));
-
-                                ResponseModel responseModel=new ResponseModel();
-                                responseModel.setMessage(messageResponseModel);
-                                responseModel.setErrorMessage(jsonObject.getString("errorMessage"));
-                                responseModel.setSuccess(jsonObject.getInt("success"));
-                                responseModel.setData(jsonObject.getJSONArray("data"));
-
-//                                updateTable();
-                            }
-                            catch(JSONException e) {
-                            }
-                        }
-
-                    },
-                    new Response.ErrorListener() {
-                        @Override
-                        public void onErrorResponse(VolleyError volleyError) {
-//                            Toast.makeText(this,getString(R.string.something_went_wrong),Toast.LENGTH_SHORT).show();
-                        }
-                    });
-            mRequestQueue.add(request);
-            return null;
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-//            mProgressBar.setVisibility(View.VISIBLE);
-        }
-
-        @Override
-        protected void onPostExecute(MessageList messageList) {
-        }
-    }*/
 
     @Override
     public void onDestroy() {
@@ -210,13 +179,9 @@ public class MainActivity extends AppCompatActivity {
                                     runOnUiThread(new Runnable(){
                                         @Override
                                         public void run(){
-                                            updateView(messageList);
-
-
+                                            updateViewAndTable(messageList);
                                         }
                                     });
-
-//                                updateTable();
                                 }
                                 catch(JSONException e) {
                                 }
@@ -233,9 +198,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         thread.start();
-
     }
-
-
 
 }

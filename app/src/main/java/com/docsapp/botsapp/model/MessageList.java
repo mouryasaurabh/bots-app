@@ -4,7 +4,7 @@ public class MessageList {
     private String sender;
     private String state;
     private String message;
-    private ResponseModel responseModel;
+//    private ResponseModel responseModel;
 
     public String getSender() {
         return sender;
@@ -30,11 +30,11 @@ public class MessageList {
         this.state = state;
     }
 
-    public ResponseModel getResponseModel() {
+    /*public ResponseModel getResponseModel() {
         return responseModel;
     }
 
     public void setResponseModel(ResponseModel responseModel) {
         this.responseModel = responseModel;
-    }
+    }*/
 }
