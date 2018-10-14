@@ -1,6 +1,6 @@
-package com.docsapp.botsapp;
+package com.docsapp.botsapp.model;
 
-class MessageResponseModel {
+public class MessageResponseModel {
 
     private int chatBotID;
     private String chatBotName;

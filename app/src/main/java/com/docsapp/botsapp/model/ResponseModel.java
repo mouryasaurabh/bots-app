@@ -1,4 +1,4 @@
-package com.docsapp.botsapp;
+package com.docsapp.botsapp.model;
 
 import org.json.JSONArray;
 
