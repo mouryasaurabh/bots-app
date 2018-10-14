@@ -2,9 +2,9 @@ package com.docsapp.botsapp.model;
 
 public class MessageList {
     private String sender;
-    private String state;
+    private int syncState=0;
     private String message;
-//    private ResponseModel responseModel;
+    private long messageId;
 
     public String getSender() {
         return sender;
@@ -22,19 +22,19 @@ public class MessageList {
         this.message = message;
     }
 
-    public String getState() {
-        return state;
+    public int getSyncState() {
+        return syncState;
     }
 
-    public void setState(String state) {
-        this.state = state;
+    public void setSyncState(int syncState) {
+        this.syncState = syncState;
+    }
+    public long getMessageId() {
+        return messageId;
     }
 
-    /*public ResponseModel getResponseModel() {
-        return responseModel;
+    public void setMessageId(long messageId) {
+        this.messageId = messageId;
     }
 
-    public void setResponseModel(ResponseModel responseModel) {
-        this.responseModel = responseModel;
-    }*/
 }

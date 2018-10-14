@@ -1,8 +1,7 @@
 package com.docsapp.botsapp.activity;
 
 import android.app.Activity;
-import android.database.Cursor;
-import android.os.AsyncTask;
+import android.content.IntentFilter;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -14,6 +13,7 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -23,6 +23,7 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.docsapp.botsapp.R;
 import com.docsapp.botsapp.database.MessageDatabaseManager;
+import com.docsapp.botsapp.listener.ConnectionListener;
 import com.docsapp.botsapp.model.MessageList;
 import com.docsapp.botsapp.model.MessageResponseModel;
 import com.docsapp.botsapp.model.ResponseModel;
@@ -34,14 +35,20 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
-    public static String ME="me";
+public class MainActivity extends AppCompatActivity implements ConnectionListener.ConnectivityReceiverListener {
+    public static final String ME="me";
+    public static final int SYNC_TRUE=1;
+    public static final int SYNC_FALSE=0;
+    public static final String CONNECTIVITY_CHANGE="android.net.conn.CONNECTIVITY_CHANGE";
+
     private RequestQueue mRequestQueue;
     private EditText mMessageEt;
     private TextView mSendButton;
     private RecyclerView mMessageRecyclerView;
     private MessageAdapter mMessageAdapter;
     private MessageDatabaseManager mMessageDatabaseManager;
+    private ArrayList<MessageList>mUnsyncMessages=new ArrayList<>();
+    private ConnectionListener connectionListener=null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +78,9 @@ public class MainActivity extends AppCompatActivity {
         mMessageDatabaseManager.open();
     }
 
+    /**
+     * The textwatcher controls the visibility of the send button
+     */
     private TextWatcher textWatcher=new TextWatcher() {
         @Override
         public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -93,10 +103,19 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    /**
+     * Initialize the recycler view and add unsent messages to queue for retry
+     */
     private void initializeRV() {
         LinearLayoutManager llm = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
         mMessageRecyclerView.setLayoutManager(llm);
         ArrayList<MessageList> messageLists=mMessageDatabaseManager.fetch();
+        for(MessageList messageListObject:messageLists){
+            if(messageListObject.getSyncState()==SYNC_FALSE){
+                mUnsyncMessages.add(messageListObject);
+                pushMessageToServer(messageListObject);
+            }
+        }
         mMessageAdapter=new MessageAdapter(this,messageLists, new MessageAdapter.onMessageItemClick() {
             @Override
             public void onItemClick(MessageList model) {
@@ -115,8 +134,10 @@ public class MainActivity extends AppCompatActivity {
             MessageList messageList=new MessageList();
             messageList.setSender(ME);
             messageList.setMessage(msg);
-            updateViewAndTable(messageList);
-            pushMessageToServer(msg);
+            long id=updateViewAndTable(true,messageList);
+            messageList.setMessageId(id);
+            mUnsyncMessages.add(messageList);
+            pushMessageToServer(messageList);
         }
     }
 
@@ -126,13 +147,26 @@ public class MainActivity extends AppCompatActivity {
         imm.hideSoftInputFromWindow(mMessageEt.getWindowToken(), 0);
     }
 
-    private void updateViewAndTable(MessageList msgList){
+    /**
+     * This method updates the view after recieving a message and clear the pending messages object from queue
+     * in case of sending it just pushes data to table
+     */
+    private long updateViewAndTable(boolean isFromSend,MessageList msgList){
         updateView(msgList);
         final String message = msgList.getMessage();
         final String sender = msgList.getSender();
-        mMessageDatabaseManager.insert(message, sender);
-    }
+        final int syncState = msgList.getSyncState();
+        if(!isFromSend){
+            MessageList messageListObject=mUnsyncMessages.get(0);
+            mUnsyncMessages.remove(0);
+            mMessageDatabaseManager.updateMessage(messageListObject.getMessageId());
 
+        }
+        return mMessageDatabaseManager.insert(message, sender,syncState);
+    }
+    /**
+     * Update recycler view on response
+     */
     private void updateView(MessageList messageListObject){
         if(mMessageAdapter!=null){
             mMessageAdapter.updateData(messageListObject);
@@ -140,12 +174,20 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
-
-    private void pushMessageToServer(String message){
-        String url=createMsgUrl(message);
-        makeAPICall(url);
+    /**
+     * This message is to send messages to server
+     */
+    private void pushMessageToServer(MessageList messageList){
+        String url=createMsgUrl(messageList.getMessage());
+        if(ConnectionListener.isConnected(this)){
+            makeAPICall(url);
+        }else{
+            Toast.makeText(this, getString(R.string.please_connect), Toast.LENGTH_SHORT).show();
+        }
     }
-
+    /**
+     * Creates url for api from message
+     */
     private String createMsgUrl(String msg){
         try {
             return "https://www.personalityforge.com/api/chat/?apiKey=6nt5d1nJHkqbkphe&message="+
@@ -157,12 +199,43 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    /**
+     * Register receiver and interface
+     */
+    @Override
+    protected void onStart() {
+        super.onStart();
+        connectionListener=new ConnectionListener();
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(CONNECTIVITY_CHANGE);
+        intentFilter.setPriority(100);
+        registerReceiver(connectionListener,intentFilter);
+
+        ConnectionListener.initListener(this);
+    }
+
+    /**
+     * Unregister receiver and interface
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if(connectionListener!=null)
+            unregisterReceiver(connectionListener);
+
+        ConnectionListener.initListener(null);
+
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
         mMessageDatabaseManager.close();
     }
 
+    /**
+     * Sending message on a separate thread
+     */
     private void makeAPICall(final String url){
 
         Thread thread = new Thread(new Runnable(){
@@ -174,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
                             public void onResponse(JSONObject jsonObject) {
 
                                 try {
-                                    System.out.println("xxxxx Response: "+jsonObject.toString());
+//                                    System.out.println("xxxxx Response: "+jsonObject.toString());
                                     JSONObject messageJsonObject = jsonObject.getJSONObject("message");
 
                                     MessageResponseModel messageResponseModel=new MessageResponseModel();
@@ -191,10 +264,11 @@ public class MainActivity extends AppCompatActivity {
                                     final MessageList messageList=new MessageList();
                                     messageList.setSender(messageResponseModel.getChatBotName());
                                     messageList.setMessage(messageResponseModel.getMessage());
+                                    messageList.setSyncState(1);
                                     runOnUiThread(new Runnable(){
                                         @Override
                                         public void run(){
-                                            updateViewAndTable(messageList);
+                                            updateViewAndTable(false,messageList);
                                         }
                                     });
                                 }
@@ -215,4 +289,21 @@ public class MainActivity extends AppCompatActivity {
         thread.start();
     }
 
+    /**
+     * This is interface method which notifies whenever internet is turned on and off.
+     * In case of turnoff, we show a toast to connect to internet
+     * when it is turned on the pending requests are sent to server
+     */
+    @Override
+    public void onNetworkConnectionChanged(boolean isConnected) {
+        if(!isConnected){
+            Toast.makeText(this, getString(R.string.please_connect), Toast.LENGTH_SHORT).show();
+        }else{
+            if(mUnsyncMessages.size()!=0){
+                for(MessageList messageListObject:mUnsyncMessages){
+                    pushMessageToServer(messageListObject);
+                }
+            }
+        }
+    }
 }

@@ -13,6 +13,7 @@ import com.docsapp.botsapp.model.MessageList;
 
 import java.util.ArrayList;
 
+
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageViewholder>{
     private ArrayList<MessageList> messageList;
     private Context mContext;
@@ -46,9 +47,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageV
         holder.mMessageText.setText(messageList.get(position).getMessage());
     }
 
-
-
-
     @Override
     public int getItemCount() {
         if(messageList.size()==0){
@@ -57,7 +55,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageV
             return messageList.size();
         }
     }
-
 
     public class MessageViewholder extends RecyclerView.ViewHolder{
         private TextView mMessageText;
@@ -79,6 +76,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.MessageV
         }
 
     }
+
     public interface onMessageItemClick{
         void onItemClick(MessageList model);
     }

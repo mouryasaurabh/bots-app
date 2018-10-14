@@ -3,5 +3,6 @@
     <string name="send">Send</string>
     <string name="chatbot">ChatBot</string>
     <string name="something_went_wrong">Something went wrong</string>
+    <string name="please_connect">Please connect to the internet</string>
 
 </resources>
